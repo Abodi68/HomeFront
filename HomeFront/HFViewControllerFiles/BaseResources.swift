@@ -1,0 +1,15 @@
+//
+//  BaseResources.swift
+//  HomeFront
+//
+//  Created by Alex Bodi on 9/14/25.
+//
+
+import UIKit
+
+extension UIColor {
+    static let hf_primary: UIColor = .systemBlue
+    static let hf_background: UIColor = .black
+    static let hf_overlay: UIColor = .black.withAlphaComponent(0.35)
+    static let hf_button: UIColor = .secondarySystemBackground.withAlphaComponent(0.9)
+}

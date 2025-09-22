@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Info -->
+    <key>CFBundleName</key>
+    <string>Homefront</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.yourname.Homefront</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+
+    <!-- Main storyboard for launch -->
+    <key>UIMainStoryboardFile</key>
+    <string>Main</string>
+
+    <!-- Optional: Launch Screen -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+
+    <!-- Scene Manifest -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneClassName</key>
+                    <string>UIWindowScene</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                    <key>UISceneStoryboardFile</key>
+                    <string>Main</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+</dict>
+</plist>
