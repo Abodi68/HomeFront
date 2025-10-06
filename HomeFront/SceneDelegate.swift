@@ -9,4 +9,5 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                options connectionOptions: UIScene.ConnectionOptions) {
         // Nothing required — storyboard sets root automatically
     }
+
 }

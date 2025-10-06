@@ -73,4 +73,36 @@ class BaseViewController: UIViewController {
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }
+    
+    /// Create a standard text field matching UI.
+    func createTextField(
+        placeholder: String,
+        fontSize: CGFloat = 18,
+        bold: Bool = false,
+        textColor: UIColor = .label,
+        backgroundColor: UIColor = UIColor.systemGray6,
+        isSecure: Bool = false,
+        autocapitalization: UITextAutocapitalizationType = .words
+    ) -> UITextField {
+        
+        let textField = UITextField()
+        
+        textField.placeholder = placeholder
+        textField.textColor = textColor
+        textField.font = bold ? UIFont.boldSystemFont(ofSize: fontSize) : UIFont.systemFont(ofSize: fontSize)
+        textField.backgroundColor = backgroundColor
+        textField.borderStyle = .roundedRect
+        textField.layer.cornerRadius = 10
+        textField.isSecureTextEntry = isSecure
+        textField.autocapitalizationType = autocapitalization
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        
+        return textField
+    }
+    
+    func showAlert(title: String, message: String, actionTitle: String = "OK") {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: actionTitle, style: .default))
+        self.present(alert, animated: true)
+    }
 }
