@@ -5,36 +5,41 @@
 
 import UIKit
 
+// MARK: - Notification Name Extension
+extension Notification.Name {
+    static let profileDidUpdate = Notification.Name("profileDidUpdate")
+}
+
 // MARK: - Profile Update Delegate
 protocol ProfileUpdateDelegate: AnyObject {
     func profileDidUpdate()
 }
 
-class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPickerViewDataSource, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPickerViewDataSource, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UITextViewDelegate {
 
-    // MARK: - Delegates
-    weak var delegateDashboard: DashboardViewController?
-    weak var delegateCommunity: CommunityViewController?
-    weak var delegateProfile: ProfileViewController?
+    // Delegates
+    weak var delegateProfile: ProfileRefreshable?
+    weak var delegateDashboard: ProfileRefreshable?
+    weak var delegateCommunity: ProfileRefreshable?
 
-
-    // MARK: - Data Sources
-    private let branches = ["Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force"]
-    private let veteranStatus = ["Active Duty", "Reserve", "National Guard", "Veteran"]
-    private let states = [
-        "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
-        "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
-        "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
-        "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
-        "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
-        "New Hampshire", "New Jersey", "New Mexico", "New York",
-        "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
-        "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-        "West Virginia", "Wisconsin", "Wyoming"
-    ]
+    private var currentAccountID: String? {
+        return LocalAccountManager.shared.currentAccount?.username
+    }
 
     // MARK: - UI Elements
+    private let scrollView: UIScrollView = {
+        let sv = UIScrollView()
+        sv.translatesAutoresizingMaskIntoConstraints = false
+        sv.keyboardDismissMode = .interactive
+        return sv
+    }()
+
+    private let contentView: UIView = {
+        let v = UIView()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        return v
+    }()
+
     private lazy var coverImageView: UIImageView = {
         let iv = UIImageView()
         iv.backgroundColor = .systemGray4
@@ -67,8 +72,36 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
     private lazy var branchField = createTextField(placeholder: "Branch of Service")
     private lazy var statusField = createTextField(placeholder: "Veteran Status")
     private lazy var stateField = createTextField(placeholder: "State of Residence")
+    
+    private let bioTextView: UITextView = {
+        let tv = UITextView()
+        tv.font = UIFont.systemFont(ofSize: 16)
+        tv.layer.cornerRadius = 8
+        tv.layer.borderWidth = 1
+        tv.layer.borderColor = UIColor.systemGray4.cgColor
+        tv.translatesAutoresizingMaskIntoConstraints = false
+        tv.text = "Tell us about yourself..."
+        tv.textColor = .secondaryLabel
+        return tv
+    }()
 
     private lazy var confirmButton = createPrimaryButton(title: "Confirm Information")
+
+    // MARK: - Data Sources
+    private let branches = ["Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force"]
+    private let veteranStatus = ["Active Duty", "Reserve", "National Guard", "Veteran"]
+    private let states = [
+        "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
+        "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
+        "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+        "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota",
+        "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+        "New Hampshire", "New Jersey", "New Mexico", "New York",
+        "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon",
+        "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
+        "West Virginia", "Wisconsin", "Wyoming"
+    ]
 
     // MARK: - Pickers
     private let branchPicker = UIPickerView()
@@ -86,18 +119,43 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
         setupImageTapGestures()
         setupKeyboardDismiss()
         loadSavedData()
-        lockImmutableFieldsIfNeeded()
+        bioTextView.delegate = self
+    }
+    
+    private func findFirstResponder(in root: UIView) -> UIView? {
+        if root.isFirstResponder { return root }
+        for sub in root.subviews {
+            if let found = findFirstResponder(in: sub) { return found }
+        }
+        return nil
     }
 
     // MARK: - UI Setup
     private func setupUI() {
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
         [coverImageView, profileImageView, titleLabel, fullNameField, preferredNameField,
-         rankField, branchField, statusField, stateField, confirmButton].forEach { view.addSubview($0) }
-
+         rankField, branchField, statusField, stateField, bioTextView, confirmButton].forEach { contentView.addSubview($0) }
+        
         NSLayoutConstraint.activate([
-            coverImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            coverImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            coverImageView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.9),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
+
+        // NOTE: Keep these dimensions in sync with ProfileViewController (cover: 0.9 width x 150h, profile: 100x100 with 50 corner radius)
+        NSLayoutConstraint.activate([
+            coverImageView.topAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.topAnchor, constant: 20),
+            coverImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            coverImageView.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.9),
             coverImageView.heightAnchor.constraint(equalToConstant: 150),
 
             profileImageView.centerYAnchor.constraint(equalTo: coverImageView.bottomAnchor),
@@ -106,11 +164,11 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
             profileImageView.heightAnchor.constraint(equalToConstant: 100),
 
             titleLabel.topAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 40),
-            titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 
             fullNameField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
-            fullNameField.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            fullNameField.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.85),
+            fullNameField.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            fullNameField.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.85),
             fullNameField.heightAnchor.constraint(equalToConstant: 44),
 
             preferredNameField.topAnchor.constraint(equalTo: fullNameField.bottomAnchor, constant: 15),
@@ -137,11 +195,17 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
             stateField.centerXAnchor.constraint(equalTo: fullNameField.centerXAnchor),
             stateField.widthAnchor.constraint(equalTo: fullNameField.widthAnchor),
             stateField.heightAnchor.constraint(equalTo: fullNameField.heightAnchor),
+            
+            bioTextView.topAnchor.constraint(equalTo: stateField.bottomAnchor, constant: 15),
+            bioTextView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            bioTextView.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.85),
+            bioTextView.heightAnchor.constraint(equalToConstant: 120),
 
-            confirmButton.topAnchor.constraint(equalTo: stateField.bottomAnchor, constant: 30),
-            confirmButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            confirmButton.topAnchor.constraint(equalTo: bioTextView.bottomAnchor, constant: 30),
+            confirmButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             confirmButton.widthAnchor.constraint(equalToConstant: 200),
-            confirmButton.heightAnchor.constraint(equalToConstant: 44)
+            confirmButton.heightAnchor.constraint(equalToConstant: 44),
+            confirmButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
     }
 
@@ -151,6 +215,15 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
         branchField.inputView = branchPicker
         statusField.inputView = statusPicker
         stateField.inputView = statePicker
+
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        let flexible = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        let done = UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(dismissKeyboard))
+        toolbar.setItems([flexible, done], animated: false)
+        branchField.inputAccessoryView = toolbar
+        statusField.inputAccessoryView = toolbar
+        stateField.inputAccessoryView = toolbar
     }
 
     func numberOfComponents(in pickerView: UIPickerView) -> Int { 1 }
@@ -230,7 +303,7 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
               let branch = branchField.text, !branch.isEmpty,
               let status = statusField.text, !status.isEmpty,
               let state = stateField.text, !state.isEmpty else {
-            showAlert(title: "Missing Information", message: "Please fill out all required fields.")
+            self.showAlert(title: "Missing Information", message: "Please fill out all required fields.")
             return
         }
 
@@ -264,69 +337,137 @@ class ProfileSetupViewController: BaseViewController, UIPickerViewDelegate, UIPi
         status: String,
         state: String
     ) {
-        // Save text info
-        UserDefaults.standard.set(name, forKey: "fullName")
-        UserDefaults.standard.set(preferredName, forKey: "preferredName")
-        UserDefaults.standard.set(rank, forKey: "rank")
-        UserDefaults.standard.set(branch, forKey: "branch")
-        UserDefaults.standard.set(status, forKey: "veteranStatus")
-        UserDefaults.standard.set(state, forKey: "stateOfResidence")
-        UserDefaults.standard.set(true, forKey: "profileSetupComplete")
-        
-        // Save profile image
-        if let profileImage = profileImageView.image,
-           let profileData = profileImage.jpegData(compressionQuality: 0.8) {
-            UserDefaults.standard.set(profileData, forKey: "profileImage")
+        guard let accountID = currentAccountID else {
+            self.showAlert(title: "Not Logged In", message: "You must be logged in to save your profile.")
+            return
         }
+
+        let store = UserProfileStore.shared
+        let existing = store.loadProfile(for: accountID)
+
+        // Build updated profile
+        var profile = UserProfile(
+            fullName: LocalAccountManager.shared.currentAccount?.fullName ?? existing?.fullName,
+            preferredName: preferredName,
+            rank: rank,
+            branch: branch,
+            veteranStatus: status,
+            stateOfResidence: state,
+            bio: existing?.bio,
+            profileImageBase64: existing?.profileImageBase64,
+            coverImageBase64: existing?.coverImageBase64
+        )
         
-        // Save cover image
-        if let coverImage = coverImageView.image,
-           let coverData = coverImage.jpegData(compressionQuality: 0.8) {
-            UserDefaults.standard.set(coverData, forKey: "coverImage")
+        let bioText = (bioTextView.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !bioText.isEmpty && bioText != "Tell us about yourself..." {
+            profile.bio = bioText
         }
-        
-        // Notify delegates to refresh UI
+
+        if let img = profileImageView.image, let data = img.jpegData(compressionQuality: 0.85) {
+            profile.profileImageBase64 = data.base64EncodedString()
+        }
+        if let img = coverImageView.image, let data = img.jpegData(compressionQuality: 0.85) {
+            profile.coverImageBase64 = data.base64EncodedString()
+        }
+
+        store.saveProfile(profile, for: accountID)
+
+        // Notify listeners
+        NotificationCenter.default.post(name: .profileDidUpdate, object: nil)
+        NotificationCenter.default.post(name: Notification.Name("ProfileSetupDidComplete"), object: nil)
         delegateProfile?.refreshFromProfile()
-        delegateCommunity?.refreshFromProfile()
         delegateDashboard?.refreshFromProfile()
-        
-        // Dismiss setup
+        delegateCommunity?.refreshFromProfile()
+
+        // Dismiss
         dismiss(animated: true)
     }
 
-
     // MARK: - Load / Lock Fields
     private func loadSavedData() {
-        fullNameField.text = UserDefaults.standard.string(forKey: "fullName")
-        preferredNameField.text = UserDefaults.standard.string(forKey: "preferredName")
-        rankField.text = UserDefaults.standard.string(forKey: "rank")
-        branchField.text = UserDefaults.standard.string(forKey: "branch")
-        statusField.text = UserDefaults.standard.string(forKey: "veteranStatus")
-        stateField.text = UserDefaults.standard.string(forKey: "stateOfResidence")
-    }
+        let account = LocalAccountManager.shared.currentAccount
+        let accountID = account?.username
+        let profile = accountID.flatMap { UserProfileStore.shared.loadProfile(for: $0) }
 
-    private func lockImmutableFieldsIfNeeded() {
-        if UserDefaults.standard.bool(forKey: "profileSetupComplete") {
-            fullNameField.isEnabled = false
-            rankField.isEnabled = false
-            branchField.isEnabled = false
+        fullNameField.text = account?.fullName ?? profile?.fullName
+        preferredNameField.text = profile?.preferredName
+        rankField.text = profile?.rank
+        branchField.text = profile?.branch
+        statusField.text = profile?.veteranStatus
+        stateField.text = profile?.stateOfResidence
+        
+        if let bio = profile?.bio, !bio.isEmpty {
+            bioTextView.text = bio
+            bioTextView.textColor = .label
         }
+
+        if let img = profile?.profileImage() { profileImageView.image = img }
+        if let cover = profile?.coverImage() { coverImageView.image = cover }
     }
 
     // MARK: - Keyboard
     private func setupKeyboardDismiss() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        view.addGestureRecognizer(tap)
+        tap.cancelsTouchesInView = false
+        contentView.addGestureRecognizer(tap)
     }
 
     @objc private func dismissKeyboard() {
         view.endEditing(true)
     }
+    
+    // MARK: - UITextViewDelegate (Placeholder behavior)
+    func textViewDidBeginEditing(_ textView: UITextView) {
+        if textView === bioTextView && textView.text == "Tell us about yourself..." {
+            textView.text = ""
+            textView.textColor = .label
+        }
+    }
 
-    // MARK: - Helper Alert
-    func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
+    func textViewDidEndEditing(_ textView: UITextView) {
+        if textView === bioTextView {
+            let trimmed = textView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                textView.text = "Tell us about yourself..."
+                textView.textColor = .secondaryLabel
+            } else {
+                textView.text = trimmed
+                textView.textColor = .label
+            }
+        }
+    }
+
+
+// MARK: - Keyboard handling
+private func registerForKeyboardNotifications() {
+    NotificationCenter.default.addObserver(self, selector: #selector(adjustForKeyboard(_:)),
+                                          name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(adjustForKeyboard(_:)),
+                                          name: UIResponder.keyboardWillHideNotification, object: nil)
+}
+
+@objc private func adjustForKeyboard(_ notification: Notification) {
+    guard let userInfo = notification.userInfo,
+          let endFrameValue = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else { return }
+
+    let endFrame = view.convert(endFrameValue.cgRectValue, from: view.window)
+    let isHiding = notification.name == UIResponder.keyboardWillHideNotification
+    let bottomInset = isHiding ? 0 : max(0, view.bounds.maxY - endFrame.origin.y)
+
+    var contentInset = scrollView.contentInset
+    contentInset.bottom = bottomInset + 16
+    scrollView.contentInset = contentInset
+    scrollView.scrollIndicatorInsets = contentInset
+
+    // If a field is active, ensure it's visible
+    if let firstResponder = findFirstResponder(in: view) {
+        scrollView.scrollRectToVisible(firstResponder.convert(firstResponder.bounds, to: scrollView), animated: true)
     }
 }
+
+deinit {
+    NotificationCenter.default.removeObserver(self)
+}
+
+}
+

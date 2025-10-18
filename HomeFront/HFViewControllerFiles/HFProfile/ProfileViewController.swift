@@ -1,6 +1,12 @@
 import UIKit
 
-class ProfileViewController: BaseViewController, ProfileRefreshable {
+
+class ProfileViewController: BaseViewController, ProfileRefreshable{
+
+    private var currentAccountID: String? {
+        // Use username as stable account identifier
+        return LocalAccountManager.shared.currentAccount?.username
+    }
 
     // MARK: - Scroll
     private let scrollView = UIScrollView()
@@ -12,12 +18,14 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
         iv.image = UIImage(systemName: "person.crop.circle")
         iv.contentMode = .scaleAspectFill
         iv.layer.cornerRadius = 50
+        iv.layer.borderWidth = 2
+        iv.layer.borderColor = UIColor.white.cgColor
         iv.clipsToBounds = true
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
 
-    private let bannerImageView: UIImageView = {
+    private let coverImageView: UIImageView = {
         let iv = UIImageView()
         iv.backgroundColor = UIColor.systemGray5
         iv.contentMode = .scaleAspectFill
@@ -43,28 +51,26 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
     }()
     private lazy var editButton = createPrimaryButton(title: "Update Profile")
     
+    private lazy var logoutButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Log Out", for: .normal)
+        button.setTitleColor(.systemRed, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Profile"
         view.backgroundColor = .systemBackground
         setupUI()
-        setupDismissKeyboardGesture()
         loadProfileData()
         setupActions()
+        makeFieldsReadOnly()
     }
     
-    // MARK: - Dismiss Keyboard
-    @objc private func setupDismissKeyboardGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-        tap.cancelsTouchesInView = false
-        view.addGestureRecognizer(tap)
-    }
-
-    @objc private func dismissKeyboard() {
-        view.endEditing(true)
-    }
-
 
     // MARK: - UI Setup
     private func setupUI() {
@@ -75,7 +81,8 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
         contentView.translatesAutoresizingMaskIntoConstraints = false
 
         // Content
-        [bannerImageView, profileImageView, fullNameField, preferredNameField, rankField, branchField, veteranStatusField, stateField, bioTextView, editButton].forEach { contentView.addSubview($0) }
+        [coverImageView, profileImageView, fullNameField, preferredNameField, rankField, branchField, veteranStatusField, stateField, bioTextView, editButton].forEach { contentView.addSubview($0) }
+        contentView.addSubview(logoutButton)
 
         NSLayoutConstraint.activate([
             // ScrollView constraints
@@ -91,17 +98,19 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
 
+            // NOTE: Dimensions mirrored from ProfileSetupViewController (cover: 0.9 width x 150h, profile: 100x100 with 50 corner radius)
             // Existing layout within contentView
-            bannerImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            bannerImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            bannerImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            bannerImageView.heightAnchor.constraint(equalToConstant: 150),
+            coverImageView.topAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.topAnchor, constant: 20),
+            coverImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            coverImageView.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.9),
+            coverImageView.heightAnchor.constraint(equalToConstant: 150),
 
-            profileImageView.topAnchor.constraint(equalTo: bannerImageView.bottomAnchor, constant: -40),
-            profileImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            profileImageView.widthAnchor.constraint(equalToConstant: 80),
-            profileImageView.heightAnchor.constraint(equalToConstant: 80),
-
+            profileImageView.centerYAnchor.constraint(equalTo: coverImageView.bottomAnchor),
+            profileImageView.centerXAnchor.constraint(equalTo: coverImageView.centerXAnchor),
+            profileImageView.widthAnchor.constraint(equalToConstant: 100),
+            profileImageView.heightAnchor.constraint(equalToConstant: 100),
+            
+            
             fullNameField.topAnchor.constraint(equalTo: profileImageView.bottomAnchor, constant: 20),
             fullNameField.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             fullNameField.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.85),
@@ -142,8 +151,11 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
             editButton.widthAnchor.constraint(equalToConstant: 160),
             editButton.heightAnchor.constraint(equalToConstant: 44),
 
-            // Content bottom
-            editButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
+            logoutButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            logoutButton.topAnchor.constraint(equalTo: editButton.bottomAnchor, constant: 20),
+            logoutButton.widthAnchor.constraint(equalToConstant: 120),
+            logoutButton.heightAnchor.constraint(equalToConstant: 36),
+            logoutButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
         ])
     }
     
@@ -151,6 +163,25 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
     // MARK: - Actions
     private func setupActions() {
         editButton.addTarget(self, action: #selector(editProfileTapped), for: .touchUpInside)
+        logoutButton.addTarget(self, action: #selector(handleLogout), for: .touchUpInside)
+    }
+    
+    private func makeFieldsReadOnly() {
+        fullNameField.isEnabled = false
+        preferredNameField.isEnabled = false
+        rankField.isEnabled = false
+        branchField.isEnabled = false
+        veteranStatusField.isEnabled = false
+        stateField.isEnabled = false
+        bioTextView.isEditable = false
+        bioTextView.isSelectable = false
+        
+        let fields: [UIView] = [fullNameField, preferredNameField, rankField, branchField, veteranStatusField, stateField, bioTextView]
+        fields.forEach { view in
+            view.alpha = 0.8
+            if let tf = view as? UITextField { tf.borderStyle = .roundedRect }
+            if let tv = view as? UITextView { tv.layer.borderColor = UIColor.systemGray3.cgColor }
+        }
     }
 
     @objc private func editProfileTapped() {
@@ -170,31 +201,63 @@ class ProfileViewController: BaseViewController, ProfileRefreshable {
         present(profileSetupVC, animated: true)
     }
 
+    @objc private func handleLogout() {
+        let alert = UIAlertController(title: "Log Out", message: "Are you sure you want to log out?", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Log Out", style: .destructive) { _ in
+            // Clear session via account manager
+            LocalAccountManager.shared.logout()
+            // Present LoginViewController modally
+            let loginVC = LoginViewController()
+            loginVC.modalPresentationStyle = .fullScreen
+            self.present(loginVC, animated: true) {
+                if let tabBar = self.tabBarController {
+                    tabBar.selectedIndex = 0
+                }
+            }
+        })
+        present(alert, animated: true)
+    }
+
     // MARK: - Refresh from Profile
     func refreshFromProfile() {
         loadProfileData()
     }
 
     private func loadProfileData() {
-        fullNameField.text = UserDefaults.standard.string(forKey: "fullName") ?? ""
-        preferredNameField.text = UserDefaults.standard.string(forKey: "preferredName") ?? ""
-        rankField.text = UserDefaults.standard.string(forKey: "rank") ?? ""
-        branchField.text = UserDefaults.standard.string(forKey: "branch") ?? ""
-        veteranStatusField.text = UserDefaults.standard.string(forKey: "veteranStatus") ?? ""
-        stateField.text = UserDefaults.standard.string(forKey: "stateOfResidence") ?? UserDefaults.standard.string(forKey: "state") ?? ""
-        bioTextView.text = UserDefaults.standard.string(forKey: "bio") ?? ""
-
-        if let profileData = UserDefaults.standard.data(forKey: "profileImage"),
-           let profile = UIImage(data: profileData) {
-            profileImageView.image = profile
+        guard let accountID = currentAccountID else {
+            // Fallback to empty if no user
+            fullNameField.text = LocalAccountManager.shared.currentAccount?.fullName ?? ""
+            preferredNameField.text = ""
+            rankField.text = ""
+            branchField.text = ""
+            veteranStatusField.text = ""
+            stateField.text = ""
+            bioTextView.text = ""
+            profileImageView.image = UIImage(systemName: "person.crop.circle")
+            coverImageView.image = nil
+            return
         }
 
-        if let coverData = UserDefaults.standard.data(forKey: "coverImage"),
-           let cover = UIImage(data: coverData) {
-            bannerImageView.image = cover
-        } else if let bannerData = UserDefaults.standard.data(forKey: "bannerImage"),
-                  let banner = UIImage(data: bannerData) {
-            bannerImageView.image = banner
+        // Load per-user profile from store
+        let store = UserProfileStore.shared
+        let profile = store.loadProfile(for: accountID)
+
+        // Populate fields, preferring account fullName if present
+        fullNameField.text = LocalAccountManager.shared.currentAccount?.fullName ?? profile?.fullName ?? ""
+        preferredNameField.text = profile?.preferredName ?? ""
+        rankField.text = profile?.rank ?? ""
+        branchField.text = profile?.branch ?? ""
+        veteranStatusField.text = profile?.veteranStatus ?? ""
+        stateField.text = profile?.stateOfResidence ?? ""
+        bioTextView.text = profile?.bio ?? ""
+
+        if let img = profile?.profileImage() {
+            profileImageView.image = img
+        }
+
+        if let cover = profile?.coverImage() {
+            coverImageView.image = cover
         }
     }
 }

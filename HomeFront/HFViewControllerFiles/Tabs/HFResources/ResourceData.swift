@@ -47,7 +47,7 @@ struct ResourceData {
         Resource(
             title: "Missouri Veterans Benefits Guide",
             description: "Comprehensive guide to Missouri-specific veterans benefits.",
-            url: "https://mvc.dps.mo.gov/docs/benefits/MissouriVeteransBenefitsGuide.pdf",
+            url: "https://mvc.dps.mo.gov/docs/veterans-benefits-guide.pdf",
             category: "Missouri"
         ),
         Resource(

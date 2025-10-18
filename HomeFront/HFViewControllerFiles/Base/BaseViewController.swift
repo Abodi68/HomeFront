@@ -23,21 +23,28 @@ class BaseViewController: UIViewController {
         
         /// Navigation bar styling (if embedded)
         if let navBar = navigationController?.navigationBar {
-            navBar.barTintColor = UIColor.hf_primary
-            navBar.tintColor = .white
-            navBar.titleTextAttributes = [
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor.hf_primary
+            appearance.titleTextAttributes = [
                 .foregroundColor: UIColor.white,
                 .font: UIFont.boldSystemFont(ofSize: 20)
             ]
-            navBar.isTranslucent = false
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+            navBar.compactAppearance = appearance
+            navBar.tintColor = .white
         }
         
         /// Tab bar styling (if inside tab bar controller)
         if let tabBar = tabBarController?.tabBar {
-            tabBar.barTintColor = UIColor.hf_background
+            let appearance = UITabBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = UIColor.hf_background
+            tabBar.standardAppearance = appearance
+            tabBar.scrollEdgeAppearance = appearance
             tabBar.tintColor = UIColor.hf_primary
             tabBar.unselectedItemTintColor = UIColor.lightGray
-            tabBar.isTranslucent = false
         }
     }
     
@@ -106,3 +113,4 @@ class BaseViewController: UIViewController {
         self.present(alert, animated: true)
     }
 }
+

@@ -18,7 +18,7 @@ class SignupViewController: BaseViewController {
         field.placeholder = "Full Name"
         field.borderStyle = .roundedRect
         field.autocapitalizationType = .words
-        field.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+        field.backgroundColor = UIColor.white.withAlphaComponent(0.7)
         field.layer.cornerRadius = 10
         field.translatesAutoresizingMaskIntoConstraints = false
         return field
@@ -30,7 +30,7 @@ class SignupViewController: BaseViewController {
         field.borderStyle = .roundedRect
         field.autocapitalizationType = .none
         field.keyboardType = .emailAddress
-        field.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+        field.backgroundColor = UIColor.white.withAlphaComponent(0.7)
         field.layer.cornerRadius = 10
         field.translatesAutoresizingMaskIntoConstraints = false
         return field
@@ -41,7 +41,7 @@ class SignupViewController: BaseViewController {
         field.placeholder = "Password"
         field.borderStyle = .roundedRect
         field.isSecureTextEntry = true
-        field.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+        field.backgroundColor = UIColor.white.withAlphaComponent(0.7)
         field.layer.cornerRadius = 10
         field.translatesAutoresizingMaskIntoConstraints = false
         return field
@@ -52,7 +52,7 @@ class SignupViewController: BaseViewController {
         field.placeholder = "Confirm Password"
         field.borderStyle = .roundedRect
         field.isSecureTextEntry = true
-        field.backgroundColor = UIColor.white.withAlphaComponent(0.9)
+        field.backgroundColor = UIColor.white.withAlphaComponent(0.7)
         field.layer.cornerRadius = 10
         field.translatesAutoresizingMaskIntoConstraints = false
         return field
@@ -131,15 +131,27 @@ class SignupViewController: BaseViewController {
     // MARK: - Actions
 
     @objc private func handleSignup() {
-        guard let password = passwordField.text,
-              let confirm = confirmPasswordField.text,
-              password == confirm else {
+        guard let fullName = nameField.text, !fullName.isEmpty,
+              let email = emailField.text, !email.isEmpty,
+              let password = passwordField.text, !password.isEmpty,
+              let confirm = confirmPasswordField.text, !confirm.isEmpty else {
+            showAlert(title: "Missing Fields", message: "All fields are required.")
+            return
+        }
+        guard password == confirm else {
             showAlert(title: "Passwords Don't Match", message: "Please make sure both password fields match.")
             return
         }
-
-        // For now, this will just send the user back to login
-        // Later, this will handle Firebase Auth createUser()
+        guard email.contains("@") && email.contains(".") else {
+            showAlert(title: "Invalid Email", message: "Please enter a valid email address.")
+            return
+        }
+        if LocalAccountManager.shared.accountExists(username: email) {
+            showAlert(title: "Account Exists", message: "An account with this email already exists.")
+            return
+        }
+        LocalAccountManager.shared.addAccount(username: email, password: password, fullName: fullName)
+        LocalAccountManager.shared.setCurrentAccount(username: email)
         let alert = UIAlertController(
             title: "Account Created",
             message: "Your account has been successfully created! Please log in.",
@@ -160,4 +172,15 @@ class SignupViewController: BaseViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+    
+    // MARK: - Keyboard
+    private func setupKeyboardDismiss() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
 }
+
