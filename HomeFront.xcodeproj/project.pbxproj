@@ -10,9 +10,22 @@
 		19FA38F22E6A600B00978B9B /* HomeFront.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HomeFront.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		199DFAAC2EA3F37600184E86 /* Exceptions for "HomeFront" folder in "HomeFront" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Fixed-Info.plist",
+			);
+			target = 19FA38F12E6A600B00978B9B /* HomeFront */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		19FA38F42E6A600B00978B9B /* HomeFront */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				199DFAAC2EA3F37600184E86 /* Exceptions for "HomeFront" folder in "HomeFront" target */,
+			);
 			path = HomeFront;
 			sourceTree = "<group>";
 		};
